@@ -63,11 +63,12 @@ def prep_ref(gtffile,fastafile,output_dir):
 	http://cufflinks.cbcb.umd.edu
 	'''
 	tmp_dir = output_dir + "/tmp/"
+	ref_sam = tmp_dir + "ref.sam"
 	print >> sys.stderr, "[%s] Making transcript to attribute lookup" % (timestamp())
 	txdict = gtf_to_attributes_dict(gtffile)
 	print >> sys.stderr, "[%s] Convert GTF reference to SAM" % (timestamp())
 	try:
-		subprocess.call(["gtf_to_sam", gtffile, tmp_dir + "/ref.sam"])
+		subprocess.call(["gtf_to_sam", gtffile, ref_sam])
 	except:
 		print "Error:  Can't call 'gtf_to_sam.'"  
 		print "Please check that Cufflinks is installed and in your path."
@@ -87,9 +88,8 @@ def prep_ref(gtffile,fastafile,output_dir):
 
 	fastidx = fastafile + ".fai"
 	print >> sys.stderr, "[%s] Convert SAM reference to BAM", timestamp()
-	#subprocess.check_output(["samtools", "view", "-o", tmp_dir + "/headered.bam", "-bt", fastidx,  tmp_dir + "/ref.sam"])
-	
-	p = subprocess.Popen(["samtools", "view", "-o", tmp_dir + "/headered.bam", "-bt", fastidx,  tmp_dir + "/ref.sam"], stderr=subprocess.PIPE)
+	header_bam = tmp_dir + "headered.bam"
+	p = subprocess.Popen(["samtools", "view", "-o", header_bam, "-bt", fastidx,  ref_sam], stderr=subprocess.PIPE)
 	out, err = p.communicate()
 	
 	pattern = re.compile('recognized')
@@ -102,16 +102,11 @@ def prep_ref(gtffile,fastafile,output_dir):
 			print "\tAs reported by samtools:"
 			print "\t", line
 			quit()
-	
-	subprocess.call(["samtools","sort",tmp_dir + "/headered.bam",tmp_dir + "/ref"])
-	subprocess.call(["samtools", "index", tmp_dir + "/ref.bam"])
-	subprocess.call(["rm", tmp_dir + "/headered.bam"])
-	subprocess.call(["rm", tmp_dir + "/ref.sam"])
-	#subprocess.call(["samtools", "view", "-o", "headered.bam", "-bt", fastidx,  tmp_dir + "/ref.sam"])
-	#subprocess.call(["samtools","sort","headered.bam","ref"])
-	#subprocess.call(["samtools", "index", "ref.bam"])
-	#subprocess.call(["rm", "headered.bam"])
-	#subprocess.call(["rm", "ref.sam"])
+	ref_bam = tmp_dir + "ref.bam"
+	subprocess.call(["samtools","sort",header_bam, "-o",ref_bam])
+	subprocess.call(["samtools", "index", ref_bam])
+	subprocess.call(["rm", header_bam])
+	subprocess.call(["rm", ref_sam])
 	return(txdict)
 
 def sam_to_bam(samfile_prefix,fastafile,output_dir):
@@ -122,19 +117,23 @@ def sam_to_bam(samfile_prefix,fastafile,output_dir):
 	subprocess.call(["samtools", "faidx", fastafile])
 	fastidx = fastafile + ".fai"
 
-	mycommands = ["samtools", "view", "-o", output_dir + "/headered.bam", "-bt", fastidx,  output_dir + "/" + samfile_prefix + ".sam"]
+	headered_bam_out = output_dir + "/"+ "headered.bam"
+	sam_out = output_dir + "/" +samfile_prefix + ".sam"
+
+	mycommands = ["samtools", "view", "-o", headered_bam_out, "-bt", fastidx,  sam_out]
 	print "[running]", " ".join(mycommands)
 	subprocess.call(mycommands)
 
-	mycommands = ["samtools","sort",output_dir + "/headered.bam",output_dir + "/" + samfile_prefix]
+	output_bam = output_dir +"/"+ samfile_prefix + ".bam"
+	mycommands = ["samtools","sort", headered_bam_out, "-o",output_bam]
 	print "[running]", " ".join(mycommands)
 	subprocess.call(mycommands)
 	
-	mycommands = ["samtools", "index", output_dir + "/" + samfile_prefix + ".bam"]
+	mycommands = ["samtools", "index", output_bam]
 	print "[running]", " ".join(mycommands)
 	subprocess.call(mycommands)
 	
-	mycommands = ["rm", output_dir + "/headered.bam"]
+	mycommands = ["rm", headered_bam_out]
 	print "[running]", " ".join(mycommands)
 	subprocess.call(mycommands)
 
@@ -169,10 +168,3 @@ def prepare_basic_output_dir(output_dir):
 
 if __name__ == "__main__":
     sys.exit(main())
-
-
-
-
-
-
-
